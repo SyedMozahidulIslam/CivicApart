@@ -15,6 +15,7 @@ import {
   ProgressNote,
   Organization,
   AuditLogEntry,
+  CivicNotification,
 } from './src/types';
 import {
   canTransitionStatus,
@@ -554,6 +555,35 @@ const auditLogs: AuditLogEntry[] = [
   },
 ];
 
+const savedReportsMap: Record<string, string[]> = {
+  'usr-citizen-1': ['rep-001', 'rep-002'],
+};
+
+const notifications: CivicNotification[] = [
+  {
+    id: 'notif-001',
+    userId: 'usr-citizen-1',
+    reportId: 'rep-001',
+    reportTitle: 'Severe crater potholes causing traffic standstill near Mirpur 10',
+    title: 'Work In Progress',
+    message: 'DNCC engineering team has arrived on site to begin asphalt patching.',
+    type: 'status_change',
+    isRead: false,
+    createdAt: '2026-10-24T14:15:00Z',
+  },
+  {
+    id: 'notif-002',
+    userId: 'usr-citizen-1',
+    reportId: 'rep-002',
+    reportTitle: 'Clogged storm drain causing knee-deep waterlogging on Dhanmondi 27',
+    title: 'Resolution Pending Confirmation',
+    message: 'DWASA has cleared the main culvert. Please confirm whether the area is draining properly.',
+    type: 'status_change',
+    isRead: false,
+    createdAt: '2026-10-25T16:00:00Z',
+  },
+];
+
 // Helper to sanitize reports for public visitors (protect personal phone / private notes)
 function sanitizeReportForPublic(report: Report, requesterRole: UserRole): Report {
   if (['admin', 'moderator', 'operator'].includes(requesterRole)) {
@@ -569,7 +599,7 @@ function sanitizeReportForPublic(report: Report, requesterRole: UserRole): Repor
 
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT || 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   app.use(express.json({ limit: '15mb' }));
 
@@ -1122,6 +1152,123 @@ async function startServer() {
   // GET: Participating Organizations
   app.get('/api/organizations', (req: Request, res: Response) => {
     res.json({ success: true, data: organizations });
+  });
+
+  // POST: Toggle Follow / Save Report
+  app.post('/api/reports/:id/follow', (req: Request, res: Response) => {
+    const currentUser = users[currentSessionUserId] || users['usr-citizen-1'];
+    const reportId = req.params.id;
+    if (!savedReportsMap[currentUser.id]) {
+      savedReportsMap[currentUser.id] = [];
+    }
+
+    const list = savedReportsMap[currentUser.id];
+    const isSaved = list.includes(reportId);
+    if (isSaved) {
+      savedReportsMap[currentUser.id] = list.filter(id => id !== reportId);
+    } else {
+      savedReportsMap[currentUser.id].push(reportId);
+    }
+
+    res.json({
+      success: true,
+      isSaved: !isSaved,
+      savedCount: savedReportsMap[currentUser.id].length,
+    });
+  });
+
+  // GET: User's Saved Reports
+  app.get('/api/users/saved-reports', (req: Request, res: Response) => {
+    const currentUser = users[currentSessionUserId] || users['usr-citizen-1'];
+    const savedIds = savedReportsMap[currentUser.id] || [];
+    const savedList = reports.filter(r => savedIds.includes(r.id)).map(r => sanitizeReportForPublic(r, currentUser.role));
+    res.json({ success: true, data: savedList });
+  });
+
+  // GET: Notifications for Current User
+  app.get('/api/notifications', (req: Request, res: Response) => {
+    const currentUser = users[currentSessionUserId] || users['usr-citizen-1'];
+    const userNotifs = notifications.filter(n => n.userId === currentUser.id);
+    res.json({ success: true, data: userNotifs });
+  });
+
+  // PATCH: Mark Notification Read
+  app.patch('/api/notifications/:id/read', (req: Request, res: Response) => {
+    const notif = notifications.find(n => n.id === req.params.id);
+    if (notif) notif.isRead = true;
+    res.json({ success: true });
+  });
+
+  // GET: Admin All Users
+  app.get('/api/admin/users', (req: Request, res: Response) => {
+    const currentUser = users[currentSessionUserId] || users['usr-visitor-1'];
+    if (currentUser.role !== 'admin') {
+      res.status(403).json({ success: false, error: 'Administrator access required' });
+      return;
+    }
+    res.json({ success: true, data: Object.values(users) });
+  });
+
+  // PATCH: Admin Update User Role
+  app.patch('/api/admin/users/:id/role', (req: Request, res: Response) => {
+    const currentUser = users[currentSessionUserId] || users['usr-visitor-1'];
+    if (currentUser.role !== 'admin') {
+      res.status(403).json({ success: false, error: 'Administrator access required' });
+      return;
+    }
+    const { role } = req.body;
+    const targetUser = users[req.params.id];
+    if (!targetUser) {
+      res.status(404).json({ success: false, error: 'User not found' });
+      return;
+    }
+    targetUser.role = role;
+    auditLogs.push({
+      id: `aud-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      userId: currentUser.id,
+      userName: currentUser.name,
+      userRole: currentUser.role,
+      action: 'UPDATE_USER_ROLE',
+      targetEntity: 'User',
+      targetId: targetUser.id,
+      details: `Changed role of ${targetUser.name} to ${role}`,
+    });
+    res.json({ success: true, data: targetUser });
+  });
+
+  // POST: Admin Create Participating Organization
+  app.post('/api/admin/organizations', (req: Request, res: Response) => {
+    const currentUser = users[currentSessionUserId] || users['usr-visitor-1'];
+    if (currentUser.role !== 'admin') {
+      res.status(403).json({ success: false, error: 'Administrator access required' });
+      return;
+    }
+    const { name, shortName, type, serviceAreas, categoriesHandled, contactEmail, contactPhone } = req.body;
+    const newOrg: Organization = {
+      id: `org-${Date.now()}`,
+      name: name || 'New Organization',
+      shortName: shortName || 'Org',
+      type: type || 'community_org',
+      serviceAreas: serviceAreas || ['Dhaka'],
+      categoriesHandled: categoriesHandled || ['roads_bridges'],
+      verifiedOfficial: true,
+      contactEmail: contactEmail || 'info@civicapart.bd',
+      contactPhone: contactPhone || '333',
+    };
+    organizations.push(newOrg);
+    auditLogs.push({
+      id: `aud-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      userId: currentUser.id,
+      userName: currentUser.name,
+      userRole: currentUser.role,
+      action: 'CREATE_ORGANIZATION',
+      targetEntity: 'Organization',
+      targetId: newOrg.id,
+      details: `Registered organization ${newOrg.name} (${newOrg.shortName})`,
+    });
+    res.status(201).json({ success: true, data: newOrg });
   });
 
   // ===================== GEMINI AI INTEGRATIONS (SERVER-SIDE) =====================

@@ -13,6 +13,7 @@ import {
   updateReportStatus,
   submitCommunityFeedback,
   addProgressNote,
+  toggleFollowReport,
 } from '../services/api';
 import { StatusBadge } from '../components/StatusBadge';
 import { UrgencyBadge } from '../components/UrgencyBadge';
@@ -147,6 +148,23 @@ export const IssueDetailPage: React.FC<Props> = ({
     }
   };
 
+  const [isFollowing, setIsFollowing] = useState(false);
+
+  const handleToggleFollow = async () => {
+    if (currentUser.role === 'visitor') {
+      setActionMessage(t.common.loginRequired);
+      return;
+    }
+    if (!report) return;
+    try {
+      const res = await toggleFollowReport(report.id);
+      setIsFollowing(res.isSaved);
+      setActionMessage(res.isSaved ? 'Report added to your Followed Issues!' : 'Report removed from Followed Issues.');
+    } catch (err: any) {
+      setActionMessage(err.message || 'Failed to follow report');
+    }
+  };
+
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
     setActionMessage('Public report link copied to clipboard!');
@@ -193,13 +211,26 @@ export const IssueDetailPage: React.FC<Props> = ({
           <span>{lang === 'bn' ? 'সকল রিপোর্টে ফিরে যান' : 'Back to Directory'}</span>
         </button>
 
-        <button
-          onClick={handleCopyLink}
-          className="text-xs text-gray-600 hover:text-blue-700 inline-flex items-center space-x-1 border border-gray-300 px-2.5 py-1 rounded bg-white"
-        >
-          <Share2 className="w-3.5 h-3.5" />
-          <span>Share Link</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={handleToggleFollow}
+            className={`text-xs inline-flex items-center space-x-1 border px-2.5 py-1 rounded transition-colors ${
+              isFollowing
+                ? 'bg-amber-50 text-amber-900 border-amber-300 font-bold'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            <span>{isFollowing ? '★ Following Issue' : '☆ Follow / Save'}</span>
+          </button>
+
+          <button
+            onClick={handleCopyLink}
+            className="text-xs text-gray-600 hover:text-blue-700 inline-flex items-center space-x-1 border border-gray-300 px-2.5 py-1 rounded bg-white"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            <span>Share Link</span>
+          </button>
+        </div>
       </div>
 
       {actionMessage && (

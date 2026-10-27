@@ -148,7 +148,7 @@ export const TransparencyPage: React.FC<Props> = ({ lang }) => {
 
           <div className="space-y-2.5">
             {Object.entries(STATUS_META).map(([statusKey, meta]) => {
-              const count = stats.statusBreakdown[statusKey as any] || 0;
+              const count = (stats.statusBreakdown as any)[statusKey] || 0;
               const pct = stats.totalReports > 0 ? Math.round((count / stats.totalReports) * 100) : 0;
               return (
                 <div key={statusKey} className="p-2.5 rounded border border-gray-100 bg-gray-50/50 flex items-center justify-between text-xs">

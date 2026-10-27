@@ -163,3 +163,16 @@ export interface PlatformStats {
   divisionBreakdown: Record<string, number>;
   communityConfirmationsTotal: number;
 }
+
+export interface CivicNotification {
+  id: string;
+  userId: string;
+  reportId: string;
+  reportTitle: string;
+  title: string;
+  message: string;
+  type: 'status_change' | 'progress_note' | 'info_requested' | 'community_vote';
+  isRead: boolean;
+  createdAt: string;
+}
+

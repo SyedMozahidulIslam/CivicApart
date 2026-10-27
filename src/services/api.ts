@@ -223,3 +223,57 @@ export async function aiCheckDuplicates(params: {
   const json = await res.json();
   return json;
 }
+
+export async function toggleFollowReport(reportId: string): Promise<{ isSaved: boolean; savedCount: number }> {
+  const res = await fetch(`/api/reports/${reportId}/follow`, { method: 'POST' });
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || 'Failed to toggle follow');
+  return json;
+}
+
+export async function fetchSavedReports(): Promise<Report[]> {
+  const res = await fetch('/api/users/saved-reports');
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || 'Failed to fetch saved reports');
+  return json.data;
+}
+
+export async function fetchNotifications(): Promise<any[]> {
+  const res = await fetch('/api/notifications');
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || 'Failed to fetch notifications');
+  return json.data;
+}
+
+export async function markNotificationRead(id: string): Promise<void> {
+  await fetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
+}
+
+export async function fetchAdminUsers(): Promise<User[]> {
+  const res = await fetch('/api/admin/users');
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || 'Failed to fetch users');
+  return json.data;
+}
+
+export async function updateUserRole(userId: string, role: UserRole): Promise<User> {
+  const res = await fetch(`/api/admin/users/${userId}/role`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role }),
+  });
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || 'Failed to update user role');
+  return json.data;
+}
+
+export async function createOrganization(orgData: Partial<Organization>): Promise<Organization> {
+  const res = await fetch('/api/admin/organizations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(orgData),
+  });
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || 'Failed to create organization');
+  return json.data;
+}
