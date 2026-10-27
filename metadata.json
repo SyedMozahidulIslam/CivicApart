@@ -1,0 +1,6 @@
+{
+  "name": "CivicApart",
+  "description": "A Public Problem Reporting and Resolution Platform for Bangladesh. Report local problems. Track real progress.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
